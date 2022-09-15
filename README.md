@@ -204,3 +204,18 @@ developed under the `development` branches (`development` for native platforms, 
 - [FFmpeg API Documentation](https://ffmpeg.org/doxygen/4.0/index.html)
 - [FFmpeg Wiki](https://trac.ffmpeg.org/wiki/WikiStart)
 - [FFmpeg External Library Licenses](https://www.ffmpeg.org/doxygen/4.0/md_LICENSE.html)
+
+### 17.Android 编译流程
+
+配置对应版本的ndk
+
+Terminal中输入
+
+export ANDROID_SDK_ROOT=/Users/xxx/Library/Android/sdk
+export ANDROID_NDK_ROOT=/Users/xxx/Library/Android/sdk/ndk/22.1.7171670
+
+./android.sh --enable-libvpx --enable-openh264 --disable-x86-64 --disable-x86 --disable-arm-v7a-neon --enable-lame
+
+如果没有生成prebuilt 或者没有在prebuilt中生成android-aar/mobile-ffmpeg/mobile-ffmpeg.aar 检查有没有错误提示，查看生成的build.log文件看是否报错，解决即可
+
+如果报打包pkg-config 错误，homebrew brew install pkg-config 安装对应的打包工具后再次执行./android.sh 相关命令
