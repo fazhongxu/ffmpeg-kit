@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2021 Taner Sener
+ * Copyright (c) 2019-2022 Taner Sener
  *
  * This file is part of FFmpegKit.
  *
@@ -35,7 +35,7 @@ import 'src/ffmpeg_kit_factory.dart';
 
 /// Abstract session implementation which includes common features shared by
 /// "FFmpeg", "FFprobe" and "MediaInformation" sessions.
-class AbstractSession extends Session {
+abstract class AbstractSession extends Session {
   static FFmpegKitPlatform _platform = FFmpegKitPlatform.instance;
 
   /// Defines how long default "getAll" methods wait, in milliseconds.
@@ -64,7 +64,7 @@ class AbstractSession extends Session {
   ///
   /// Returns FFmpeg session created.
   static Future<FFmpegSession> createFFmpegSession(List<String> argumentsArray,
-      [LogRedirectionStrategy? logRedirectionStrategy = null]) async {
+      [LogRedirectionStrategy? logRedirectionStrategy]) async {
     try {
       await FFmpegKitConfig.init();
       final Map<dynamic, dynamic>? nativeSession =
@@ -118,7 +118,7 @@ class AbstractSession extends Session {
   /// Returns FFprobe session created.
   static Future<FFprobeSession> createFFprobeSession(
       List<String> argumentsArray,
-      [LogRedirectionStrategy? logRedirectionStrategy = null]) async {
+      [LogRedirectionStrategy? logRedirectionStrategy]) async {
     try {
       await FFmpegKitConfig.init();
       final Map<dynamic, dynamic>? nativeSession =
@@ -428,5 +428,18 @@ class AbstractSession extends Session {
   bool isMediaInformation() => false;
 
   /// Cancels running the session.
-  void cancel() {}
+  Future<void> cancel() async {
+    try {
+      final int? sessionId = getSessionId();
+      await FFmpegKitConfig.init();
+      if (sessionId == null) {
+        return _platform.ffmpegKitCancel();
+      } else {
+        return _platform.ffmpegKitCancelSession(sessionId);
+      }
+    } on PlatformException catch (e, stack) {
+      print("Plugin cancel error: ${e.message}");
+      return Future.error("cancel failed.", stack);
+    }
+  }
 }

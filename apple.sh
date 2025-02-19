@@ -56,14 +56,14 @@ create_umbrella_xcframework() {
   local BUILD_COMMAND="xcodebuild -create-xcframework "
 
   for ARCHITECTURE_VARIANT_INDEX in "${TARGET_ARCHITECTURE_VARIANT_INDEX_ARRAY[@]}"; do
-    local FRAMEWORK_PATH=${BASEDIR}/prebuilt/$(get_framework_directory "${ARCHITECTURE_VARIANT_INDEX}")/${FRAMEWORK_NAME}.framework
-    BUILD_COMMAND+=" -framework ${FRAMEWORK_PATH}"
+    local FRAMEWORK_PATH="${BASEDIR}"/prebuilt/$(get_framework_directory "${ARCHITECTURE_VARIANT_INDEX}")/${FRAMEWORK_NAME}.framework
+    BUILD_COMMAND+=" -framework \"${FRAMEWORK_PATH}\""
   done
 
-  BUILD_COMMAND+=" -output ${XCFRAMEWORK_PATH}"
+  BUILD_COMMAND+=" -output \"${XCFRAMEWORK_PATH}\""
 
   # EXECUTE CREATE FRAMEWORK COMMAND
-  COMMAND_OUTPUT=$(${BUILD_COMMAND} 2>&1)
+  COMMAND_OUTPUT=$(eval ${BUILD_COMMAND} 2>&1)
   RC=$?
   echo -e "DEBUG: ${COMMAND_OUTPUT}\n" 1>>"${BASEDIR}"/build.log 2>&1
 
@@ -141,7 +141,6 @@ echo -e "INFO: Using iOS SDK: ${DETECTED_IOS_SDK_VERSION}, tvOS SDK: ${DETECTED_
 echo -e "INFO: Build options: $*\n" 1>>"${BASEDIR}"/build.log 2>&1
 
 # SET DEFAULT BUILD OPTIONS
-GPL_ENABLED="no"
 DISPLAY_HELP=""
 BUILD_TYPE_ID=""
 BUILD_FULL=""

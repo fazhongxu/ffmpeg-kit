@@ -45,8 +45,8 @@ under the prebuilt folder.\n"
 
   echo -e "Libraries:"
   echo -e "  --full\t\t\tenables all external libraries"
-  echo -e "  --enable-android-media-codec\tbuild with built-in Android MediaCodec support[no]"
-  echo -e "  --enable-android-zlib\t\tbuild with built-in zlib support[no]"
+  echo -e "  --enable-android-media-codec\tbuild with built-in Android MediaCodec support [no]"
+  echo -e "  --enable-android-zlib\t\tbuild with built-in zlib support [no]"
 
   display_help_common_libraries
   display_help_gpl_libraries
@@ -70,7 +70,7 @@ build_application_mk() {
     local LTS_BUILD_FLAG="-DFFMPEG_KIT_LTS "
   fi
 
-  if [[ ${ENABLED_LIBRARIES[$LIBRARY_X265]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_TESSERACT]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_OPENH264]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_SNAPPY]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_RUBBERBAND]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_ZIMG]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_SRT]} -eq 1 ]] || [[ -n ${CUSTOM_LIBRARY_USES_CPP} ]]; then
+  if [[ ${ENABLED_LIBRARIES[$LIBRARY_X265]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_TESSERACT]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_OPENH264]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_SNAPPY]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_RUBBERBAND]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_ZIMG]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_SRT]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_CHROMAPRINT]} -eq 1 ]] || [[ ${ENABLED_LIBRARIES[$LIBRARY_LIBILBC]} -eq 1 ]] || [[ -n ${CUSTOM_LIBRARY_USES_CPP} ]]; then
     local APP_STL="c++_shared"
   else
     local APP_STL="none"
@@ -224,17 +224,14 @@ get_common_includes() {
 
 get_common_cflags() {
   if [[ -n ${FFMPEG_KIT_LTS_BUILD} ]]; then
-    local LTS_BUILD__FLAG="-DFFMPEG_KIT_LTS "
+    local LTS_BUILD_FLAG="-DFFMPEG_KIT_LTS "
   fi
 
-  case ${DETECTED_NDK_VERSION} in
-    23*)
-      echo "-fstrict-aliasing -DANDROID_NDK -fPIC -DANDROID ${LTS_BUILD__FLAG}-D__ANDROID__ -D__ANDROID_MIN_SDK_VERSION__=${API}"
-      ;;
-    *)
-      echo "-fno-integrated-as -fstrict-aliasing -DANDROID_NDK -fPIC -DANDROID ${LTS_BUILD__FLAG}-D__ANDROID__ -D__ANDROID_API__=${API}"
-      ;;
-  esac
+  if [[ $(compare_versions "$DETECTED_NDK_VERSION" "23") -ge 0 ]]; then
+    echo "-fstrict-aliasing -DANDROID_NDK -fPIC -DANDROID ${LTS_BUILD_FLAG}-D__ANDROID__ -D__ANDROID_MIN_SDK_VERSION__=${API}"
+  else
+    echo "-fno-integrated-as -fstrict-aliasing -DANDROID_NDK -fPIC -DANDROID ${LTS_BUILD_FLAG}-D__ANDROID__ -D__ANDROID_API__=${API}"
+  fi
 }
 
 get_arch_specific_cflags() {
@@ -249,24 +246,18 @@ get_arch_specific_cflags() {
     echo "-march=armv8-a -DFFMPEG_KIT_ARM64_V8A"
     ;;
   x86)
-    case ${DETECTED_NDK_VERSION} in
-      23*)
-        echo "-march=i686 -mtune=generic -mssse3 -mfpmath=sse -m32 -DFFMPEG_KIT_X86"
-        ;;
-      *)
-        echo "-march=i686 -mtune=intel -mssse3 -mfpmath=sse -m32 -DFFMPEG_KIT_X86"
-        ;;
-    esac
+    if [[ $(compare_versions "$DETECTED_NDK_VERSION" "23") -ge 0 ]]; then
+      echo "-march=i686 -mtune=generic -mssse3 -mfpmath=sse -m32 -DFFMPEG_KIT_X86"
+    else
+      echo "-march=i686 -mtune=intel -mssse3 -mfpmath=sse -m32 -DFFMPEG_KIT_X86"
+    fi
     ;;
   x86-64)
-    case ${DETECTED_NDK_VERSION} in
-      23*)
-        echo "-march=x86-64 -msse4.2 -mpopcnt -m64 -mtune=generic -DFFMPEG_KIT_X86_64"
-        ;;
-      *)
-        echo "-march=x86-64 -msse4.2 -mpopcnt -m64 -mtune=intel -DFFMPEG_KIT_X86_64"
-        ;;
-    esac
+    if [[ $(compare_versions "$DETECTED_NDK_VERSION" "23") -ge 0 ]]; then
+      echo "-march=x86-64 -msse4.2 -mpopcnt -m64 -mtune=generic -DFFMPEG_KIT_X86_64"
+    else
+      echo "-march=x86-64 -msse4.2 -mpopcnt -m64 -mtune=intel -DFFMPEG_KIT_X86_64"
+    fi
     ;;
   esac
 }
@@ -325,6 +316,9 @@ get_app_specific_cflags() {
     ;;
   ffmpeg)
     APP_FLAGS="-Wno-unused-function -DBIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD"
+    ;;
+  gnutls)
+    APP_FLAGS="-std=c99 -Wno-unused-function -D_GL_USE_STDLIB_ALLOC=1"
     ;;
   kvazaar)
     APP_FLAGS="-std=gnu99 -Wno-unused-function"
@@ -393,7 +387,7 @@ get_cxxflags() {
   x265)
     echo "-std=c++11 -fno-exceptions ${OPTIMIZATION_FLAGS}"
     ;;
-  rubberband | srt | zimg)
+  rubberband | srt | tesseract | zimg)
     echo "-std=c++11 ${OPTIMIZATION_FLAGS}"
     ;;
   *)
@@ -410,9 +404,9 @@ get_common_linked_libraries() {
 
     # SUPPORTED ON API LEVEL 24 AND LATER
     if [[ ${API} -ge 24 ]]; then
-      echo "-lc -lm -ldl -llog -lcamera2ndk -lmediandk ${COMMON_LIBRARY_PATHS}"
+      echo "-lc -lm -ldl -llog -landroid -lcamera2ndk -lmediandk ${COMMON_LIBRARY_PATHS}"
     else
-      echo "-lc -lm -ldl -llog ${COMMON_LIBRARY_PATHS}"
+      echo "-lc -lm -ldl -llog -landroid ${COMMON_LIBRARY_PATHS}"
       echo -e "INFO: Building ffmpeg without native camera API which is not supported on Android API Level ${API}\n" 1>>"${BASEDIR}"/build.log 2>&1
     fi
     ;;
@@ -1037,33 +1031,30 @@ set_toolchain_paths() {
   export CC=$(get_clang_host)-clang
   export CXX=$(get_clang_host)-clang++
 
-  if [ "$1" == "x264" ]; then
-    export AS=${CC}
-  else
-    export AS=${HOST}-as
-  fi
-
   case ${ARCH} in
   arm64-v8a)
     export ac_cv_c_bigendian=no
     ;;
   esac
-  case ${DETECTED_NDK_VERSION} in
-    23*)
-      export AR=llvm-ar
-      export LD=lld
-      export RANLIB=llvm-ranlib
-      export STRIP=llvm-strip
-      export NM=llvm-nm
-      ;;
-    *)
-      export AR=${HOST}-ar
-      export LD=${HOST}-ld
-      export RANLIB=${HOST}-ranlib
-      export STRIP=${HOST}-strip
-      export NM=${HOST}-nm
-    ;;
-  esac
+  if [[ $(compare_versions "$DETECTED_NDK_VERSION" "23") -ge 0 ]]; then
+    export AR=llvm-ar
+    export LD=lld
+    export RANLIB=llvm-ranlib
+    export STRIP=llvm-strip
+    export NM=llvm-nm
+    export AS=$CC
+  else
+    export AR=${HOST}-ar
+    export LD=${HOST}-ld
+    export RANLIB=${HOST}-ranlib
+    export STRIP=${HOST}-strip
+    export NM=${HOST}-nm
+    if [ "$1" == "x264" ]; then
+      export AS=${CC}
+    else
+      export AS=${HOST}-as
+    fi
+  fi
   export INSTALL_PKG_CONFIG_DIR="${BASEDIR}"/prebuilt/$(get_build_directory)/pkgconfig
   export ZLIB_PACKAGE_CONFIG_PATH="${INSTALL_PKG_CONFIG_DIR}/zlib.pc"
 

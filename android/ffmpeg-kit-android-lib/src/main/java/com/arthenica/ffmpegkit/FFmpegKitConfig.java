@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2021 Taner Sener
+ * Copyright (c) 2018-2022 Taner Sener
  *
  * This file is part of FFmpegKit.
  *
@@ -144,8 +144,6 @@ public class FFmpegKitConfig {
 
         NativeLoader.loadFFmpegKit(nativeFFmpegTriedAndFailed);
 
-        android.util.Log.i(FFmpegKitConfig.TAG, String.format("Loaded ffmpeg-kit-%s-%s-%s-%s.", NativeLoader.loadPackageName(), NativeLoader.loadAbi(), NativeLoader.loadVersion(), NativeLoader.loadBuildDate()));
-
         uniqueIdGenerator = new AtomicInteger(1);
 
         /* NATIVE LOG LEVEL IS RECEIVED ONLY ON STARTUP */
@@ -175,7 +173,7 @@ public class FFmpegKitConfig {
         safFileDescriptorMap = new SparseArray<>();
         globalLogRedirectionStrategy = LogRedirectionStrategy.PRINT_LOGS_WHEN_NO_CALLBACKS_DEFINED;
 
-        NativeLoader.enableRedirection();
+        android.util.Log.i(FFmpegKitConfig.TAG, String.format("Loaded ffmpeg-kit-%s-%s-%s-%s.", NativeLoader.loadPackageName(), NativeLoader.loadAbi(), NativeLoader.loadVersion(), NativeLoader.loadBuildDate()));
     }
 
     /**
@@ -336,7 +334,7 @@ public class FFmpegKitConfig {
      */
     private static void statistics(final long sessionId, final int videoFrameNumber,
                                    final float videoFps, final float videoQuality, final long size,
-                                   final int time, final double bitrate, final double speed) {
+                                   final double time, final double bitrate, final double speed) {
         final Statistics statistics = new Statistics(sessionId, videoFrameNumber, videoFps, videoQuality, size, time, bitrate, speed);
 
         final Session session = getSession(sessionId);
@@ -430,14 +428,14 @@ public class FFmpegKitConfig {
                 String mappedFontName = mapping.getValue();
 
                 if ((fontName != null) && (mappedFontName != null) && (fontName.trim().length() > 0) && (mappedFontName.trim().length() > 0)) {
-                    fontNameMappingBlock.append("        <match target=\"pattern\">\n");
-                    fontNameMappingBlock.append("                <test qual=\"any\" name=\"family\">\n");
-                    fontNameMappingBlock.append(String.format("                        <string>%s</string>\n", fontName));
-                    fontNameMappingBlock.append("                </test>\n");
-                    fontNameMappingBlock.append("                <edit name=\"family\" mode=\"assign\" binding=\"same\">\n");
-                    fontNameMappingBlock.append(String.format("                        <string>%s</string>\n", mappedFontName));
-                    fontNameMappingBlock.append("                </edit>\n");
-                    fontNameMappingBlock.append("        </match>\n");
+                    fontNameMappingBlock.append("    <match target=\"pattern\">\n");
+                    fontNameMappingBlock.append("        <test qual=\"any\" name=\"family\">\n");
+                    fontNameMappingBlock.append(String.format("            <string>%s</string>\n", fontName));
+                    fontNameMappingBlock.append("        </test>\n");
+                    fontNameMappingBlock.append("        <edit name=\"family\" mode=\"assign\" binding=\"same\">\n");
+                    fontNameMappingBlock.append(String.format("            <string>%s</string>\n", mappedFontName));
+                    fontNameMappingBlock.append("        </edit>\n");
+                    fontNameMappingBlock.append("    </match>\n");
 
                     validFontNameMappingCount++;
                 }
@@ -455,7 +453,7 @@ public class FFmpegKitConfig {
             fontConfigBuilder.append("</dir>\n");
         }
         fontConfigBuilder.append(fontNameMappingBlock);
-        fontConfigBuilder.append("</fontconfig>");
+        fontConfigBuilder.append("</fontconfig>\n");
 
         final AtomicReference<FileOutputStream> reference = new AtomicReference<>();
         try {
@@ -696,7 +694,15 @@ public class FFmpegKitConfig {
             final ReturnCode returnCode = new ReturnCode(returnCodeValue);
             mediaInformationSession.complete(returnCode);
             if (returnCode.isValueSuccess()) {
-                MediaInformation mediaInformation = MediaInformationJsonParser.fromWithError(mediaInformationSession.getAllLogsAsString(waitTimeout));
+                List<Log> allLogs = mediaInformationSession.getAllLogs(waitTimeout);
+                final StringBuilder ffprobeJsonOutput = new StringBuilder();
+                for (int i = 0, allLogsSize = allLogs.size(); i < allLogsSize; i++) {
+                    Log log = allLogs.get(i);
+                    if (log.getLevel() == Level.AV_LOG_STDERR) {
+                        ffprobeJsonOutput.append(log.getMessage());
+                    }
+                }
+                MediaInformation mediaInformation = MediaInformationJsonParser.fromWithError(ffprobeJsonOutput.toString());
                 mediaInformationSession.setMediaInformation(mediaInformation);
             }
         } catch (final Exception e) {
@@ -1086,6 +1092,22 @@ public class FFmpegKitConfig {
             throw new IllegalArgumentException("Session history size must not exceed the hard limit!");
         } else if (sessionHistorySize > 0) {
             FFmpegKitConfig.sessionHistorySize = sessionHistorySize;
+            deleteExpiredSessions();
+        }
+    }
+
+    /**
+     * Deletes expired sessions.
+     */
+    private static void deleteExpiredSessions() {
+        while (sessionHistoryList.size() > sessionHistorySize) {
+            try {
+                Session expiredSession = sessionHistoryList.remove(0);
+                if (expiredSession != null) {
+                    sessionHistoryMap.remove(expiredSession.getSessionId());
+                }
+            } catch (final IndexOutOfBoundsException ignored) {
+            }
         }
     }
 
@@ -1099,18 +1121,13 @@ public class FFmpegKitConfig {
 
             /*
              * ASYNC SESSIONS CALL THIS METHOD TWICE
-             * THIS CHECK PREVENTS ADDING THE SAME SESSION TWICE
+             * THIS CHECK PREVENTS ADDING THE SAME SESSION AGAIN
              */
             final boolean sessionAlreadyAdded = sessionHistoryMap.containsKey(session.getSessionId());
             if (!sessionAlreadyAdded) {
                 sessionHistoryMap.put(session.getSessionId(), session);
                 sessionHistoryList.add(session);
-                if (sessionHistoryList.size() > sessionHistorySize) {
-                    try {
-                        sessionHistoryList.remove(0);
-                    } catch (final IndexOutOfBoundsException ignored) {
-                    }
-                }
+                deleteExpiredSessions();
             }
         }
     }
